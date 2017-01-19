@@ -3,5 +3,5 @@ project(CacheObliviousRangeTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
-set(SOURCE_FILES main.cpp RangeTree.cpp RangeTree.h)
+set(SOURCE_FILES main.cpp RangeTree.cpp RangeTree.h TreePrinter.cpp TreePrinter.h)
 add_executable(CacheObliviousRangeTree ${SOURCE_FILES})
