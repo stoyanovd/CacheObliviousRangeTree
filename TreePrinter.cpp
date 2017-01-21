@@ -11,8 +11,12 @@ void bst_print_dot_aux(Node *node, FILE *stream, std::function<int(Node *)> &nod
 {
     static int nullcount = 0;
 
-    fprintf(stream, "    %d [label=<%d<BR /> <FONT POINT-SIZE=\"10\">\[%d, %d\]</FONT>>]\n",
-            node_printer(node), node_printer(node), node->left_border, node->right_border);
+    fprintf(stream, "    %d [label=<%d<BR />"
+                " <FONT POINT-SIZE=\"10\">\[%d, %d\]</FONT>"
+                "<BR />%d>]\n",
+            node_printer(node), node_printer(node),
+            node->left_border, node->right_border,
+            node->x);
 
 //     a[label=<Birth of George Washington<BR />
 //        <FONT POINT-SIZE="10">See also: American Revolution</FONT>>];

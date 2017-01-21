@@ -7,6 +7,7 @@
 #include <stack>
 #include <chrono>
 #include <fstream>
+#include <zconf.h>
 
 #include "RangeTree.h"
 #include "TreePrinter.h"
@@ -22,7 +23,6 @@ std::vector<Node> makeDefaultTree(int N_elements, std::vector<int> &underlied_ar
     nodes.back().right_border = N_elements;
     nodes.back().trivial_i = 0;
     q.push(0);
-    int last_array_index = 0;
     while (!q.empty())
     {
         int current_v = q.front();
@@ -33,7 +33,7 @@ std::vector<Node> makeDefaultTree(int N_elements, std::vector<int> &underlied_ar
 
         if (v.left_border == v.right_border)
         {
-            v.x = underlied_array[last_array_index++];
+            v.x = underlied_array[v.left_border - 1];
             continue;
         }
 //        if (v.left_border != middle_border_left)
@@ -93,7 +93,12 @@ int aggregate_func_neutral = 0;
 
 int aggregate_existing_children(Node *v)
 {
+    if (!(v->l) && !(v->r))
+    {
+        return v->x;
+    }
     int x = aggregate_func_neutral;
+
     if (v->l)
     {
         x = aggregate_func(x, v->l->x);
@@ -209,7 +214,7 @@ void update(Node *root, int pos, int new_val)
 
 int query(Node *v, int left, int right)
 {
-    if (right > left)
+    if (left > right)
     {
         return aggregate_func_neutral;
     }
@@ -248,9 +253,9 @@ void read_input_from_file(std::string const &file,
                           std::vector<int> &array_from_file,
                           std::vector<Task> &tasks_from_file)
 {
-    std::ifstream ifs(file, std::ios_base::in);
-
-    int N_elements;
+    std::ifstream ifs;
+    ifs.open(file, std::ios_base::in);
+    int N_elements = 0;
     ifs >> N_elements;
 
     for (int i = 0; i < N_elements; i++)
@@ -307,7 +312,7 @@ void make_random_input(int N_elements, int number_tests,
     }
 }
 
-void benchmark_tree(Node *root, int N_elements, std::vector<Task> tasks)
+void benchmark_tree(Node *root, std::vector<Task> tasks)
 {
     for (auto task : tasks)
     {
@@ -320,6 +325,14 @@ void benchmark_tree(Node *root, int N_elements, std::vector<Task> tasks)
             int ans = query(root, task.l, task.r);
             if (task.ans_is_filled)
             {
+                if (ans != task.ans)
+                {
+                    std::cout << "Test with ans failed. l = " << task.l
+                              << "; r = " << task.r
+                              << "; ans = " << task.ans
+                              << "; prog ans = " << ans
+                              << std::endl;
+                }
                 assert(ans == task.ans);
             }
         }
@@ -328,7 +341,7 @@ void benchmark_tree(Node *root, int N_elements, std::vector<Task> tasks)
 
 std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes)
 {
-    std::vector<Node> nodes_vEB(4 * N_elements);
+    std::vector<Node> nodes_vEB(nodes.capacity());
     fillvEBIndexes(&nodes[0], (int) ceil(log2(N_elements) + 1));
 
     std::vector<Node *> filtered_nodes;
@@ -337,11 +350,11 @@ std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes)
         filtered_nodes.push_back(&v);
     }
     // TODO Why commenting this cause free(): invalid pointer
-    filtered_nodes.erase(
-        std::remove_if(filtered_nodes.begin(), filtered_nodes.end(), [](Node *v)
-        { return v->trivial_i == -1 || v->i_vEB == -1; }),
-        filtered_nodes.end()
-    );
+//    filtered_nodes.erase(
+//        std::remove_if(filtered_nodes.begin(), filtered_nodes.end(), [](Node *v)
+//        { return v->trivial_i == -1 || v->i_vEB == -1; }),
+//        filtered_nodes.end()
+//    );
     std::sort(filtered_nodes.begin(), filtered_nodes.end(), [](Node *x, Node *y)
     { return x->i_vEB < y->i_vEB; });
 
@@ -349,8 +362,6 @@ std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes)
     {
         nodes_vEB[vp->i_vEB] = Node(*vp);
         assert(vp->i_vEB < 4 * N_elements);
-
-        // TODO make nodes large enough
 
         assert(!(vp->l) || (vp->l->i_vEB != -1));
         assert(!(vp->r) || (vp->r->i_vEB != -1));
@@ -367,10 +378,40 @@ std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes)
 //const int N = 65;
 //const int N = 31;
 
+template<class T>
+inline T sqr(T x)
+{
+    return x * x;
+}
+
 #define PRINT_SIZE_TIPS 1
 #define WRITE_PNGS 0
 #define BENCHMARK_MODE 1
-#define TESTING_IN_WEB_MODE 0
+
+const int L2_SIZE = 256 * 1024;
+
+int clean_cache()
+{
+    std::vector<int> a(L2_SIZE);
+    int s = 0;
+    for (int i = 0; i < L2_SIZE; i++)
+    {
+        a[i] = i;
+    }
+    for (int i = 0; i < L2_SIZE; i++)
+    {
+        s += a[i];
+    }
+    return s;
+}
+
+void clean_cache_L3()
+{
+    sync();
+
+    std::ofstream ofs("/proc/sys/vm/drop_caches");
+    ofs << "3" << std::endl;
+}
 
 int main()
 {
@@ -380,10 +421,6 @@ int main()
     const int BLOCKS_NUMBER = 90;
     int N_elements = N_in_block * BLOCKS_NUMBER;
     // N_elements = 30
-
-#if TESTING_IN_WEB_MODE
-    std::cin >> N_elements;
-#endif
 
 #if PRINT_SIZE_TIPS
     std::cout << "Node size: " << sizeof(Node) << " bytes." << std::endl;
@@ -406,22 +443,17 @@ int main()
 
     int number_tasks = 100 * 1000;
 
-//    read_input_from_file("test.in", underlied_array, tasks);
+//    read_input_from_file("../test.in", underlied_array, tasks);
     make_random_input(N_elements, number_tasks, underlied_array, tasks);
-#if TESTING_IN_WEB_MODE
-    for (int i = 0; i < N_elements; i++)
-    {
-        int x;
-        std::cin >> x;
-        underlied_array.push_back(x);
-    }
-#else
-    for (int i = 0; i < N_elements; i++)
-    {
-        underlied_array.push_back(rand() % 17239);
-    }
-#endif
 
+    if (N_elements != underlied_array.size())
+    {
+        N_elements = underlied_array.size();
+    }
+    if (number_tasks != tasks.size())
+    {
+        number_tasks = tasks.size();
+    }
     std::vector<Node> nodes = makeDefaultTree(N_elements, underlied_array);
     update_full_tree(&nodes[0]);
 
@@ -445,50 +477,66 @@ int main()
     std::cout << "Finish building." << std::endl;
 #endif
 
+#if WRITE_PNGS
+    print_tree_to_png(&nodes_vEB[0], "tree_vEB", [](Node *v)
+    { return v->i_vEB; });
+#endif
+
 #if BENCHMARK_MODE
     ////////////////////////////////////////
     ///// Testing
     ////////////////////////////////////////
 
-    int NUMBER_REPEATS = 3;
+    int NUMBER_REPEATS = 30;
     int time_sum = 0;
+    int time_sqr_sum = 0;
     for (int i = 0; i < NUMBER_REPEATS; i++)
     {
+        clean_cache();
         auto tm_before = std::chrono::high_resolution_clock::now();
-        benchmark_tree(&nodes[0], N_elements, tasks);
+        benchmark_tree(&nodes[0], tasks);
         auto tm_after = std::chrono::high_resolution_clock::now();
-        time_sum += std::chrono::duration_cast<std::chrono::milliseconds>(tm_after - tm_before).count();
+        int cur = std::chrono::duration_cast<std::chrono::milliseconds>(tm_after - tm_before).count();
+        time_sum += cur;
+        time_sqr_sum += sqr(cur);
     }
 
+    int classic_approx = time_sum / NUMBER_REPEATS;
     std::cout << "==========" << std::endl;
     std::cout << "Classic: "
-              << time_sum / NUMBER_REPEATS
+              << classic_approx
+              << " (sigma=" << sqrt(time_sqr_sum / NUMBER_REPEATS - sqr(time_sum / NUMBER_REPEATS)) << ")"
               << std::endl;
 
     //////////
 
     time_sum = 0;
+    time_sqr_sum = 0;
     for (int i = 0; i < NUMBER_REPEATS; i++)
     {
+        clean_cache();
         auto tm_before = std::chrono::high_resolution_clock::now();
-        benchmark_tree(&nodes_vEB[0], N_elements, tasks);
+        benchmark_tree(&nodes_vEB[0], tasks);
         auto tm_after = std::chrono::high_resolution_clock::now();
-        time_sum += std::chrono::duration_cast<std::chrono::milliseconds>(tm_after - tm_before).count();
+        int cur = std::chrono::duration_cast<std::chrono::milliseconds>(tm_after - tm_before).count();
+        time_sum += cur;
+        time_sqr_sum += cur * cur;
     }
 
+    int vanEmdeBoas_approx = time_sum / NUMBER_REPEATS;
     std::cout << "van Emde Boas: "
-              << time_sum / NUMBER_REPEATS
+              << vanEmdeBoas_approx
+              << " (sigma=" << sqrt(time_sqr_sum / NUMBER_REPEATS - sqr(time_sum / NUMBER_REPEATS)) << ")"
               << std::endl;
 
+    std::cout << "Performance difference in "
+              << int(100 * (classic_approx * 1.0 / vanEmdeBoas_approx - 1)) << "%"
+              << std::endl;
     std::cout << "==========" << std::endl;
     std::cout << "End." << std::endl;
 
 #endif
 
-#if PRINT_SIZE_TIPS
-    print_tree_to_png(&nodes_vEB[0], "tree_vEB", [](Node *v)
-    { return v->i_vEB; });
-#endif
 
     return 0;
 }
