@@ -81,19 +81,26 @@ int main(int argc, char *argv[])
 {
     google::InitGoogleLogging(argv[0]);
 
+    int N_in_block = 256 * 1024 / sizeof(Node);
+    if (argc == 2)
+    {
+        N_in_block = std::stoi(argv[1]);
+    }
+
     // L1 size
+//    const int N_in_block = 8 * 1024 / sizeof(Node);
 //    const int N_in_block = 32 * 1024 / sizeof(Node);
     // L2 size
 //    const int N_in_block = 256 * 1024 / sizeof(Node);
     // L3 size
-    const int N_in_block = 6144 * 1024 / sizeof(Node);
+//    const int N_in_block = 6144 * 1024 / sizeof(Node);
 
-    const int BLOCKS_NUMBER = 90;
+    int BLOCKS_NUMBER = 90;
     int N_elements = N_in_block * BLOCKS_NUMBER;
 //    N_elements = 11;
 
     std::cout << "Node size: " << sizeof(Node) << " bytes." << std::endl;
-    std::cout << "Cache size (on my processor): 6144 KB." << std::endl;
+    std::cout << "L3 Cache size (on my processor): 6144 KB." << std::endl;
     std::cout << "  So, nearly " << N_in_block << " nodes will be in one cache block." << std::endl;
     std::cout << "Let's say, we want to work with " << BLOCKS_NUMBER << " blocks." << std::endl;
     std::cout << "So, we need " << N_elements << " nodes." << std::endl;
