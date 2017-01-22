@@ -1,20 +1,19 @@
-
 #ifndef CACHEOBLIVIOUSRANGETREE_RANGETREE_H
 #define CACHEOBLIVIOUSRANGETREE_RANGETREE_H
 
-const int PLACE_HOLDER_SIZE = 200;
+#include <vector>
+#include "Node.h"
 
-struct Node
+struct RangeTree
 {
-    Node *l = nullptr;
-    Node *r = nullptr;
-    Node *a = nullptr;
-    int i_vEB = -1;
-    int trivial_i = -1;
-    int left_border, right_border;
-    int x;
+    // Tree Building
+    static std::vector<Node> makeDefaultTree(int N_elements, std::vector<int> &underlied_array);
+    static std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes);
 
-//    int place_holder[PLACE_HOLDER_SIZE];
+    // Queries
+    static int query(Node *v, int left, int right);
+    static void update(Node *root, int pos, int new_val);
+    static Node *find(Node *root, int pos);
 };
 
 #endif //CACHEOBLIVIOUSRANGETREE_RANGETREE_H
