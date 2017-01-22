@@ -234,12 +234,6 @@ int query(Node *v, int left, int right)
     return x;
 }
 
-std::vector<std::pair<int, int>> updates_data;
-
-std::vector<std::pair<int, int>> queries_data;
-
-std::vector<int> queries_answers;
-
 struct Task
 {
     bool is_update;
@@ -284,6 +278,7 @@ void read_input_from_file(std::string const &file,
         tasks_from_file.push_back(task);
     }
 }
+
 void make_random_input(int N_elements, int number_tests,
                        std::vector<int> &array, std::vector<Task> &tasks)
 {
@@ -349,12 +344,6 @@ std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes)
     {
         filtered_nodes.push_back(&v);
     }
-    // TODO Why commenting this cause free(): invalid pointer
-//    filtered_nodes.erase(
-//        std::remove_if(filtered_nodes.begin(), filtered_nodes.end(), [](Node *v)
-//        { return v->trivial_i == -1 || v->i_vEB == -1; }),
-//        filtered_nodes.end()
-//    );
     std::sort(filtered_nodes.begin(), filtered_nodes.end(), [](Node *x, Node *y)
     { return x->i_vEB < y->i_vEB; });
 
@@ -373,32 +362,25 @@ std::vector<Node> make_vEB_tree(int N_elements, std::vector<Node> &nodes)
     return nodes_vEB;
 }
 
-//const int N = 10000;
-//const int N = 70;
-//const int N = 65;
-//const int N = 31;
-
 template<class T>
 inline T sqr(T x)
 {
     return x * x;
 }
 
-#define PRINT_SIZE_TIPS 1
-#define WRITE_PNGS 0
-#define BENCHMARK_MODE 1
-
 const int L2_SIZE = 256 * 1024;
 
-int clean_cache()
+const int L3_SIZE = 6144 * 1024;
+
+int clean_cache(int c)
 {
-    std::vector<int> a(L2_SIZE);
+    std::vector<int> a(L3_SIZE);
     int s = 0;
-    for (int i = 0; i < L2_SIZE; i++)
+    for (int i = 0; i < a.size(); i++)
     {
-        a[i] = i;
+        a[i] = i * 5 - 2 + c;
     }
-    for (int i = 0; i < L2_SIZE; i++)
+    for (int i = 0; i < a.size(); i++)
     {
         s += a[i];
     }
@@ -413,16 +395,18 @@ void clean_cache_L3()
     ofs << "3" << std::endl;
 }
 
+#define WRITE_PNGS 0
+#define BENCHMARK_MODE 1
+
 int main()
 {
-//    const int N_in_block = 6144 * 1024 / sizeof(Node);
+    const int N_in_block = 6144 * 1024 / sizeof(Node);
 //    const int N_in_block = 32 * 1024 / sizeof(Node);
-    const int N_in_block = 256 * 1024 / sizeof(Node);
+//    const int N_in_block = 256 * 1024 / sizeof(Node);
     const int BLOCKS_NUMBER = 90;
     int N_elements = N_in_block * BLOCKS_NUMBER;
     // N_elements = 30
 
-#if PRINT_SIZE_TIPS
     std::cout << "Node size: " << sizeof(Node) << " bytes." << std::endl;
     std::cout << "Cache size (on my processor): 6144 KB." << std::endl;
     std::cout << "  So, nearly " << N_in_block << " nodes will be in one cache block." << std::endl;
@@ -432,7 +416,6 @@ int main()
     std::cout << "And nearly " << 2 * N_elements << " nodes accordingly." << std::endl;
     std::cout << "(it is approximately " << 2 * N_elements * sizeof(Node) / 1024 / 1024 << " Mbytes in memory."
               << std::endl;
-#endif
 
     ////////////////////////////////////////
     ///// Building
@@ -462,20 +445,9 @@ int main()
     { return v->trivial_i; });
 #endif
 
-//    nodes.erase(
-//        std::remove_if(nodes.begin(), nodes.end(), [](Node &v)
-//        { return v.trivial_i == -1; }),
-//        nodes.end()
-//    );
-
     std::vector<Node> nodes_vEB = make_vEB_tree(N_elements, nodes);
 
-//    nodes
-//    nodes_vEB
-
-#if PRINT_SIZE_TIPS
     std::cout << "Finish building." << std::endl;
-#endif
 
 #if WRITE_PNGS
     print_tree_to_png(&nodes_vEB[0], "tree_vEB", [](Node *v)
@@ -487,26 +459,34 @@ int main()
     ///// Testing
     ////////////////////////////////////////
 
-    int NUMBER_REPEATS = 30;
-    int time_sum = 0;
-    int time_sqr_sum = 0;
+    int NUMBER_REPEATS = 50;
+    double time_sum = 0;
+    double time_sqr_sum = 0;
+
+    std::cout << std::endl;
+
     for (int i = 0; i < NUMBER_REPEATS; i++)
     {
-        clean_cache();
+        clean_cache(i);
         auto tm_before = std::chrono::high_resolution_clock::now();
         benchmark_tree(&nodes[0], tasks);
         auto tm_after = std::chrono::high_resolution_clock::now();
-        int cur = std::chrono::duration_cast<std::chrono::milliseconds>(tm_after - tm_before).count();
+        double cur = std::chrono::duration_cast<std::chrono::microseconds>(tm_after - tm_before).count();
+        std::cout << cur << " ";
         time_sum += cur;
         time_sqr_sum += sqr(cur);
     }
+    std::cout << std::endl;
 
-    int classic_approx = time_sum / NUMBER_REPEATS;
+    double classic_approx = time_sum * 1.0 / NUMBER_REPEATS;
     std::cout << "==========" << std::endl;
     std::cout << "Classic: "
               << classic_approx
-              << " (sigma=" << sqrt(time_sqr_sum / NUMBER_REPEATS - sqr(time_sum / NUMBER_REPEATS)) << ")"
+              << " (sigma=" << sqrt(time_sqr_sum * 1.0 / NUMBER_REPEATS -
+        sqr(classic_approx))
+              << ")"
               << std::endl;
+    std::cout << std::endl;
 
     //////////
 
@@ -514,19 +494,22 @@ int main()
     time_sqr_sum = 0;
     for (int i = 0; i < NUMBER_REPEATS; i++)
     {
-        clean_cache();
+        clean_cache(i);
         auto tm_before = std::chrono::high_resolution_clock::now();
         benchmark_tree(&nodes_vEB[0], tasks);
         auto tm_after = std::chrono::high_resolution_clock::now();
-        int cur = std::chrono::duration_cast<std::chrono::milliseconds>(tm_after - tm_before).count();
+        double cur = std::chrono::duration_cast<std::chrono::microseconds>(tm_after - tm_before).count();
+        std::cout << cur << " ";
         time_sum += cur;
         time_sqr_sum += cur * cur;
     }
+    std::cout << std::endl;
 
-    int vanEmdeBoas_approx = time_sum / NUMBER_REPEATS;
+    double vanEmdeBoas_approx = time_sum * 1.0 / NUMBER_REPEATS;
     std::cout << "van Emde Boas: "
               << vanEmdeBoas_approx
-              << " (sigma=" << sqrt(time_sqr_sum / NUMBER_REPEATS - sqr(time_sum / NUMBER_REPEATS)) << ")"
+              << " (sigma = " << sqrt(time_sqr_sum * 1.0 / NUMBER_REPEATS -
+        sqr(vanEmdeBoas_approx)) << ")"
               << std::endl;
 
     std::cout << "Performance difference in "
